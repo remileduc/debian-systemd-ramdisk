@@ -16,18 +16,18 @@
 
 # systemd service unit file that calls the script to load / save persistent data
 [Unit]
-Description=Copy or Save cache folders
+Description=Copy or Save SYSTEM cache folders
 DefaultDependencies=no
 Before=rsyslog.service syslog.target systemd-journald.service sysinit.target shutdown.target
 After=local-fs.target
 Conflicts=shutdown.target
-RequiresMountsFor=/var/cache /var/log /home/xinouch/.cache
+RequiresMountsFor=/var/cache /var/log
 IgnoreOnIsolate=yes
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/sbin/ramdisk_cache.sh
-ExecStop=/usr/local/sbin/ramdisk_cache.sh
+ExecStart=/usr/local/sbin/ramdisk_cache.sh cache log
+ExecStop=/usr/local/sbin/ramdisk_cache.sh cache log
 RemainAfterExit=yes
 
 [Install]

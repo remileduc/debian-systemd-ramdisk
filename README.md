@@ -58,22 +58,23 @@ Systemd mount this folder in RAM by default. If you are lucky, you don't have an
 		Sys. de fichiers Type     Taille Utilisé Dispo Uti% Monté sur
 		udev             devtmpfs    16G       0   16G   0% /dev
 		tmpfs            tmpfs      3,2G    9,6M  3,2G   1% /run
-		/dev/nvme0n1p6   ext4       183G    5,2G  168G   3% /
+		/dev/nvme0n1p6   ext4       183G    5,4G  168G   4% /
 		tmpfs            tmpfs       16G       0   16G   0% /dev/shm
 		tmpfs            tmpfs      5,0M    4,0K  5,0M   1% /run/lock
 		tmpfs            tmpfs       16G       0   16G   0% /sys/fs/cgroup
-		tmpfs            tmpfs       16G    109M   16G   1% /var/cache
-		tmpfs            tmpfs       16G    120K   16G   1% /tmp
-		tmpfs            tmpfs       16G     35M   16G   1% /var/log
+		tmpfs            tmpfs       16G     44K   16G   1% /tmp
+		tmpfs            tmpfs       16G    127M   16G   1% /var/cache
+		tmpfs            tmpfs       16G     38M   16G   1% /var/log
 		/dev/nvme0n1p5   ext4       233M     24M  193M  11% /boot
 		/dev/nvme0n1p2   vfat        95M     25M   71M  27% /boot/efi
 		/dev/nvme0n1p7   ext4       262G     47G  202G  19% /home
-		tmpfs            tmpfs       16G    406M   16G   3% /home/xinouch/.cache
-		/dev/nvme0n1p4   fuseblk    500G     42G  458G   9% /mnt/w10
+		tmpfs            tmpfs       16G     58M   16G   1% /home/xinouch/.mozilla
+		tmpfs            tmpfs       16G    434M   16G   3% /home/xinouch/.cache
+		/dev/nvme0n1p4   fuseblk    500G     93G  407G  19% /mnt/w10
 		/dev/sda2        fuseblk    924G    287G  637G  32% /mnt/data
-		/dev/sda3        ext4       7,9G    584M  6,9G   8% /mnt/persistent
+		/dev/sda3        ext4       7,9G    691M  6,8G  10% /mnt/persistent
 		tmpfs            tmpfs      3,2G       0  3,2G   0% /run/user/114
-		tmpfs            tmpfs      3,2G     16K  3,2G   1% /run/user/1000
+		tmpfs            tmpfs      3,2G     12K  3,2G   1% /run/user/1000
 ```
 
 All the lines with a `tmpfs` filesystem are mounted on the RAM. So, if you have the line
@@ -102,7 +103,9 @@ Reboot and voilà!
 Cache in ramdisk
 ================
 
-You have 2 cache folders: the system one in `/var/cache` and the user one in `/home/$USER/.cache`. We will also take care of the logs in `/var/log`. If you don't want it, check the last subsection of this section.
+You have 2 cache folders: the system one in `/var/cache` and the user one in `/home/$USER/.cache`. We will also take care of the logs in `/var/log` along with the firefox session folder. If you don't want it, check the last subsection of this section.
+
+We need to distinguish 2 types of folders here: the system folders and the user folders. The user folders will be mounted later in the boot, while the system folders will be mounted as soon as possible. For me, it takes 1 minute to load user data.
 
 Change files for your config
 ----------------------------
@@ -132,23 +135,29 @@ now you can simply
 	$ mv home-xinouch-.cache.mount home-{USER}-.cache.mount
 ```
 
-### copycache.service ###
+### home-xinouch-.mozilla.mount ###
 
-In the section [Unit], change the key `RequiresMountsFor` for the last element:
+Same as in the previous section.
+
+### userramdisk.service ###
+
+In the section [Unit], change the key `RequiresMountsFor`:
 
 ```
-	RequiresMountsFor=/var/cache /var/log /home/{USER}/.cache
+	RequiresMountsFor=/home/{USER}/.cache /home/{USER}/.mozilla
 ```
 
 ### ramdisk_cache.sh ###
 
-You need to change all the `persistent` and `user` config variables at the top of the file:
+You need to change the `ramdisks` variable with your paths:
 
 ```bash
-	cacheUser="/home/xinouch/.cache"
-	persistent="/mnt/persistent/system"
-	persistentLog="/mnt/persistent/log"
-	persistentUser="/mnt/persistent/home"
+	declare -A ramdisks=(
+		["cache"]="/var/cache /mnt/persistent/system"
+		["log"]="/var/log /mnt/persistent/log"
+		["usercache"]="/home/xinouch/.cache /mnt/persistent/home"
+		["firefoxsession"]="/home/xinouch/.mozilla /mnt/persistent/firefox"
+	)
 ```
 
 Here, we assume that everything will be saved into a partition mounted in `/mnt/persistent`. You can save it in your home if you want, though you shouldn't store root data in your home... Anyway, be sure that the filesystem for the persistency is NOT `NTFS` but a Linux thing like `ext4`, or you will destroy the permissions... It is also recommended to mount it with the following permissions, as it should be just a backup: `defaults,nodev,noexec,nosuid,noatime,nodiratime`.
@@ -161,15 +170,17 @@ Now that everything is correctly configured, we need to install everything in th
 ```
 	# cp ramdisk_cache.sh /usr/local/sbin/
 	# chmod u+x /usr/local/sbin/ramdisk_cache.sh
-	# cp copycache.service /etc/systemd/system/
-	# cp var-cache.mount var-log.mount home-{USER}-.cache.mount /usr/share/systemd/
+	# cp systemramdisk.service /etc/systemd/system/
+	# cp userramdisk.service /etc/systemd/system/
+	# cp var-cache.mount var-log.mount home-{USER}-.cache.mount home-{USER}-.mozilla.mount /usr/share/systemd/
 
 	# ln -s /usr/share/systemd/var-cache.mount /etc/systemd/system/var-cache.mount
 	# ln -s /usr/share/systemd/var-log.mount /etc/systemd/system/var-log.mount
 	# ln -s /usr/share/systemd/home-{USER}-.cache.mount /etc/systemd/system/home-{USER}-.cache.mount
+	# ln -s /usr/share/systemd/home-{USER}-.mozilla.mount /etc/systemd/system/home-{USER}-.mozilla.mount
 
 	# systemctl daemon-reload
-	# systemctl enable var-cache.mount var-log.mount home-{USER}-.cache.mount copycache.service
+	# systemctl enable var-cache.mount var-log.mount home-{USER}-.cache.mount home-{USER}-.mozilla.mount systemramdisk.service userramdisk.service
 ```
 
 Before rebooting, we need to save the cache (and check everything works :p), so run `ramdisk_cache.sh` as root and check that your persistent folders are filled with the correct data.
@@ -178,7 +189,7 @@ We also need to setup a `cron` so the script is run every X minutes (here every 
 
 ```
 	# crontab -e
-		* */1 * * * /usr/local/sbin/ramdisk_cache.sh
+		0 * * * * /usr/local/sbin/ramdisk_cache.sh cache log usercache firefoxsession
 ```
 
 Get rid of `/var/log`
@@ -196,14 +207,14 @@ Get rid of `/var/log`
 
 At the install step, don't copy, link or enable the file `var-log.mount`.
 
-### Change the service copycache ###
+### Change the service systemramdisk ###
 
-In the section `Unit` of `copycache.service`, change the keys `Before` and `RequiresMountsFor`. If you already installed it, do the changes to the file `/etc/systemd/system/copycache.service`:
+In the section `Unit` of `systemramdisk.service`, change the keys `Before` and `RequiresMountsFor`. If you already installed it, do the changes to the file `/etc/systemd/system/systemramdisk.service`:
 
 ```
 	Before=sysinit.target shutdown.target
 	...
-	RequiresMountsFor=/var/cache /home/{USER}/.cache
+	RequiresMountsFor=/var/cache
 ```
 
 ### Change the script ###
@@ -211,6 +222,11 @@ In the section `Unit` of `copycache.service`, change the keys `Before` and `Requ
 Remove everything related to logs. If you already did the install, change the file `/usr/local/sbin/ramdisk_cache.sh`.
 
 Finish by executing `systemctl daemon-reload` as root.
+
+Change the user ramdisks
+------------------------
+
+In the same way, edit the files corresponding to the user ramdisks if you don't want it.
 
 License
 =======

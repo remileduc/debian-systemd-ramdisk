@@ -20,44 +20,47 @@
 
 set -efu
 
-cache="/var/cache"
-log="/var/log"
-cacheUser="/home/xinouch/.cache"
-persistent="/mnt/persistent/system"
-persistentLog="/mnt/persistent/log"
-persistentUser="/mnt/persistent/home"
+# we create a dictionnary whose values are strings with space separated paths.
+# the first path is the mounted ramdisk, the second path is the save folder.
+
+declare -A ramdisks=(
+#	["test"]="mounted persistent" # mkdir mounted persistent; touch persistent/test
+	["cache"]="/var/cache /mnt/persistent/system"
+	["log"]="/var/log /mnt/persistent/log"
+	["usercache"]="/home/xinouch/.cache /mnt/persistent/home"
+	["firefoxsession"]="/home/xinouch/.mozilla /mnt/persistent/firefox"
+)
 lockfile=".cache.lock"
 logfile="/tmp/ramdisk_cache.log"
 
-# first we copy system cache
-# if the lockfile exists in cache, we save the cache in persistent
-if [ -e "$cache"/"$lockfile" ]; then
-	rsync -aqu --delete --exclude "$lockfile" "$cache/" "$persistent/"
-	echo "$(date -Iseconds) - system cache saved to persistent" >> "$logfile"
-else # we put persistent cache in ramdisk
-	rsync -aq "$persistent/" "$cache/"
-	touch "$cache"/"$lockfile"
-	echo "$(date -Iseconds) - system cache loaded from persistent" >> "$logfile"
-fi
+function manageRamdisk { # mounted, persistent
+	mounted="$1"
+	persistent="$2"
 
-# second we copy system log
-# if the lockfile exists in cache, we save the cache in persistent
-if [ -e "$log"/"$lockfile" ]; then
-	rsync -aqu --delete --exclude "$lockfile" "$log/" "$persistentLog/"
-	echo "$(date -Iseconds) - logs saved to persistent" >> "$logfile"
-else # we put persistent cache in ramdisk
-	rsync -aq "$persistentLog/" "$log/"
-	touch "$log"/"$lockfile"
-	echo "$(date -Iseconds) - logs loaded from persistent" >> "$logfile"
-fi
+	# if the lockfile exists in mounted, we save the content in persistent
+	if [ -e "$mounted"/"$lockfile" ]; then
+		rsync -aqu --delete --exclude "$lockfile" "$mounted/" "$persistent/"
+		echo "$(date -Iseconds) - $mounted saved to persistent" >> "$logfile"
+	else # we put persistent content in ramdisk
+		rsync -aq "$persistent/" "$mounted/"
+		touch "$mounted"/"$lockfile"
+		echo "$(date -Iseconds) - $mounted loaded from persistent" >> "$logfile"
+	fi
+}
 
-# then we copy user cache
-# if the lockfile exists in cache, we save the cache in persistent
-if [ -e "$cacheUser"/"$lockfile" ]; then
-	rsync -aqu --delete --exclude "$lockfile" "$cacheUser/" "$persistentUser/"
-	echo "$(date -Iseconds) - user cache saved to persistent" >> "$logfile"
-else # we put persistent cache in ramdisk
-	rsync -aq "$persistentUser/" "$cacheUser/"
-	touch "$cacheUser"/"$lockfile"
-	echo "$(date -Iseconds) - user cache loaded from persistent" >> "$logfile"
-fi
+for ramdisk in $@; do
+	mounted="$(echo ${ramdisks[$ramdisk]} | cut -sd ' ' -f 1)"
+	persistent="$(echo ${ramdisks[$ramdisk]} | cut -sd ' ' -f 2)"
+
+	# if wrong parameter, we terminate
+	if [ -z "$mounted" ] || [ -z "$persistent" ]; then
+		echo "'$ramdisk' is not valid." >> "$logfile"
+		echo "'$ramdisk' is not valid. Use one of these:"
+		for r in "${!ramdisks[@]}"; do
+			echo -e "\t$r"
+		done
+		exit 1
+	fi
+
+	manageRamdisk "$mounted" "$persistent"
+done
