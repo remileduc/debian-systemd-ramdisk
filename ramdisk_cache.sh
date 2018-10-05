@@ -27,8 +27,8 @@ declare -A ramdisks=(
 #	["test"]="mounted persistent" # mkdir mounted persistent; touch persistent/test
 	["cache"]="/var/cache /mnt/persistent/system"
 	["log"]="/var/log /mnt/persistent/log"
-	["usercache"]="/home/xinouch/.cache /mnt/persistent/home"
-	["firefoxsession"]="/home/xinouch/.mozilla /mnt/persistent/firefox"
+	["usercache"]="/home/sid/.cache /mnt/persistent/home"
+	["firefoxsession"]="/home/sid/.mozilla /mnt/persistent/firefox"
 )
 lockfile=".cache.lock"
 logfile="/tmp/ramdisk_cache.log"

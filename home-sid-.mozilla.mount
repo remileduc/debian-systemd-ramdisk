@@ -16,10 +16,10 @@
 
 # systemd unit file that mounts the user's cache folder
 [Unit]
-Description=User Cache Directory
+Description=User Firefox session Directory
 Documentation=man:hier(7)
 Documentation=http://www.freedesktop.org/wiki/Software/systemd/APIFileSystems
-ConditionPathIsSymbolicLink=!/home/xinouch/.cache
+ConditionPathIsSymbolicLink=!/home/sid/.mozilla
 DefaultDependencies=no
 Conflicts=umount.target
 Before=local-fs.target umount.target
@@ -27,7 +27,7 @@ After=swap.target
 
 [Mount]
 What=tmpfs
-Where=/home/xinouch/.cache
+Where=/home/sid/.mozilla
 Type=tmpfs
 Options=mode=1777,strictatime,nosuid,nodev
 

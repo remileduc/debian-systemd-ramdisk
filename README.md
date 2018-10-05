@@ -29,6 +29,31 @@ I also mount the `/var/log` folder into a ramdisk, which has no performance impr
 
 This is a simple setup I use for my computer, don't hesitate to contribute to make it eaily usable by anyone.
 
+### Table of contents
+
+[TMPFS](#tmpfs)
+
+[Temporary files in ramdisk](#temporary-files-in-ramdisk)
+- [Check the current state](#check-the-current-state)
+- [Enable it](#enable-it)
+
+[Cache in ramdisk](#cache-in-ramdisk)
+- [Change files for your config](#change-files-for-your-config)
+    - [home-sid-.cache.mount](#home-sid-cachemount)
+    - [home-sid-.mozilla.mount](#home-sid-mozillamount)
+    - [userramdisk.service](#userramdiskservice)
+    - [ramdisk_cache.sh](#ramdisk_cachesh)
+- [Install (and copy files)](#install-and-copy-files)
+- [Get rid of `/var/log`](#get-rid-of-varlog)
+    - [Remove `var-log.mount`](#remove-var-logmount)
+    - [If you already installed everything](#if-you-already-installed-everything)
+    - [If you haven't installed yet](#if-you-havent-installed-yet)
+    - [Change the service systemramdisk](#change-the-service-systemramdisk)
+    - [Change the script](#change-the-script)
+- [Change the user ramdisks](#change-the-user-ramdisks)
+
+[License](#license)
+
 TMPFS
 =====
 
@@ -68,8 +93,8 @@ Systemd mount this folder in RAM by default. If you are lucky, you don't have an
 		/dev/nvme0n1p5   ext4       233M     24M  193M  11% /boot
 		/dev/nvme0n1p2   vfat        95M     25M   71M  27% /boot/efi
 		/dev/nvme0n1p7   ext4       262G     47G  202G  19% /home
-		tmpfs            tmpfs       16G     58M   16G   1% /home/xinouch/.mozilla
-		tmpfs            tmpfs       16G    434M   16G   3% /home/xinouch/.cache
+		tmpfs            tmpfs       16G     58M   16G   1% /home/sid/.mozilla
+		tmpfs            tmpfs       16G    434M   16G   3% /home/sid/.cache
 		/dev/nvme0n1p4   fuseblk    500G     93G  407G  19% /mnt/w10
 		/dev/sda2        fuseblk    924G    287G  637G  32% /mnt/data
 		/dev/sda3        ext4       7,9G    691M  6,8G  10% /mnt/persistent
@@ -110,9 +135,9 @@ We need to distinguish 2 types of folders here: the system folders and the user 
 Change files for your config
 ----------------------------
 
-### home-xinouch-.cache.mount ###
+### home-sid-.cache.mount ###
 
-The first file to change is `home-xinouch-.cache.mount` as your user is certainly not named *xinouch*.
+The first file to change is `home-sid-.cache.mount` as your user is certainly not named *sid*.
 
 In the section `Unit`, change the key `ConditionPathIsSymbolicLink=`, in the `Mount` section, change the key `Where` with your path (change the name of the user):
 
@@ -132,10 +157,10 @@ You also need to change the filename so it sticks to the path. To do so, you can
 now you can simply
 
 ```bash
-	$ mv home-xinouch-.cache.mount home-{USER}-.cache.mount
+	$ mv home-sid-.cache.mount home-{USER}-.cache.mount
 ```
 
-### home-xinouch-.mozilla.mount ###
+### home-sid-.mozilla.mount ###
 
 Same as in the previous section.
 
@@ -155,8 +180,8 @@ You need to change the `ramdisks` variable with your paths:
 	declare -A ramdisks=(
 		["cache"]="/var/cache /mnt/persistent/system"
 		["log"]="/var/log /mnt/persistent/log"
-		["usercache"]="/home/xinouch/.cache /mnt/persistent/home"
-		["firefoxsession"]="/home/xinouch/.mozilla /mnt/persistent/firefox"
+		["usercache"]="/home/sid/.cache /mnt/persistent/home"
+		["firefoxsession"]="/home/sid/.mozilla /mnt/persistent/firefox"
 	)
 ```
 
@@ -183,7 +208,7 @@ Now that everything is correctly configured, we need to install everything in th
 	# systemctl enable var-cache.mount var-log.mount home-{USER}-.cache.mount home-{USER}-.mozilla.mount systemramdisk.service userramdisk.service
 ```
 
-Before rebooting, we need to save the cache (and check everything works :p), so run `ramdisk_cache.sh` as root and check that your persistent folders are filled with the correct data.
+Before rebooting, we need to save the cache (and check everything works :p), so run `ramdisk_cache.sh cache log usercache firefoxsession` as root and check that your persistent folders are filled with the correct data.
 
 We also need to setup a `cron` so the script is run every X minutes (here every hour but you can change), so you don't lose too much if your system crashes:
 

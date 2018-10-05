@@ -22,7 +22,7 @@ DefaultDependencies=no
 Before=sysinit.target shutdown.target
 After=local-fs.target
 Conflicts=shutdown.target
-RequiresMountsFor=/home/xinouch/.cache /home/xinouch/.mozilla
+RequiresMountsFor=/home/sid/.cache /home/sid/.mozilla
 IgnoreOnIsolate=yes
 
 [Service]
